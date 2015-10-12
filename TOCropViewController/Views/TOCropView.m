@@ -769,6 +769,7 @@ typedef NS_ENUM(NSInteger, TOCropViewOverlayEdge) {
         self.backgroundImageView.frame = (CGRect){CGPointZero, image.size};
         [self resetLayoutToDefaultAnimated:NO];
     }
+
 }
 
 - (BOOL)cropBoxAspectRatioIsPortrait
