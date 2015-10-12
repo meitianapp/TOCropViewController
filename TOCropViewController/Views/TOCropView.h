@@ -34,9 +34,9 @@
 @interface TOCropView : UIView
 
 /**
- The image that the crop view is displaying. This cannot be changed once the crop view is instantiated.
+ The image that the crop view is displaying. Dynamic change will not recalculate image size
  */
-@property (nonatomic, strong, readonly) UIImage *image;
+@property (nonatomic, strong) UIImage *image;
 
 /**
  A delegate object that receives notifications from the crop view
@@ -103,6 +103,10 @@
  */
 - (instancetype)initWithImage:(UIImage *)image;
 
+- (instancetype)initWithImage:(UIImage *)image withCropViewPadding:(CGFloat)padding;
+
+- (instancetype)initWithImage:(UIImage *)image withCropViewPadding:(CGFloat)padding withCropTimerDuration:(NSTimeInterval)cropTimerDuration;
+
 /**
  When performing large size transitions (eg, orientation rotation),
  set simple mode to YES to temporarily graphically heavy effects like translucency.
@@ -157,6 +161,11 @@
  Animate the cropping component views to become visible
  */
 - (void)setCroppingViewsHidden:(BOOL)hidden animated:(BOOL)animated;
+
+/**
+ Get croppedImage in async mode
+ */
+- (void)getCroppedImage:(void (^)(UIImage *image))returnImage;
 
 
 @end
