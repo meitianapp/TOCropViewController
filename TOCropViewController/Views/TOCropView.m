@@ -196,7 +196,7 @@ typedef NS_ENUM(NSInteger, TOCropViewOverlayEdge) {
     self.translucencyView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     [self addSubview:self.translucencyView];
     
-    self.foregroundContainerView = [[UIView alloc] initWithFrame:(CGRect){0,0,200,200}];
+    self.foregroundContainerView = [[UIView alloc] initWithFrame:self.backgroundContainerView.frame];
     self.foregroundContainerView.clipsToBounds = YES;
     self.foregroundContainerView.userInteractionEnabled = NO;
     [self addSubview:self.foregroundContainerView];
@@ -748,9 +748,16 @@ typedef NS_ENUM(NSInteger, TOCropViewOverlayEdge) {
 }
 
 - (void)setImage:(UIImage *)image {
+    CGSize originSize = _image.size;
     _image = image;
     self.backgroundImageView.image = _image;
     self.foregroundImageView.image = _image;
+
+    if (!CGSizeEqualToSize(image.size, originSize)) {
+        // the image size has changed, needs to refresh frame
+        self.backgroundImageView.frame = (CGRect){CGPointZero, image.size};
+        [self resetLayoutToDefaultAnimated:NO];
+    }
 }
 
 - (BOOL)cropBoxAspectRatioIsPortrait
