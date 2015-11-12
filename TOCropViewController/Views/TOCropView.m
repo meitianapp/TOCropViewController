@@ -764,12 +764,12 @@ typedef NS_ENUM(NSInteger, TOCropViewOverlayEdge) {
     _image = image;
     self.backgroundImageView.image = _image;
     self.foregroundImageView.image = _image;
+
     if (!CGSizeEqualToSize(image.size, originSize)) {
         // the image size has changed, needs to refresh frame
         self.backgroundImageView.frame = (CGRect){CGPointZero, image.size};
         [self resetLayoutToDefaultAnimated:NO];
     }
-
 }
 
 - (BOOL)cropBoxAspectRatioIsPortrait
