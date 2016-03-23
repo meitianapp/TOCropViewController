@@ -23,11 +23,12 @@
 #import "TOCropView.h"
 #import "TOCropOverlayView.h"
 #import "TOCropScrollView.h"
+#import "UIImage+CropRotate.h"
 
 #define TOCROPVIEW_BACKGROUND_COLOR [UIColor colorWithWhite:0.12f alpha:1.0f]
 
-static const CGFloat kTOCropViewPadding = 14.0f;
-static const NSTimeInterval kTOCropTimerDuration = 0.8f;
+static const CGFloat kTOCropViewDefaultPadding = 14.0f;
+static const NSTimeInterval kTOCropTimerDefaultDuration = 0.8f;
 static const CGFloat kTOCropViewMinimumBoxSize = 42.0f;
 
 /* When the user taps down to resize the box, this state is used
@@ -45,8 +46,6 @@ typedef NS_ENUM(NSInteger, TOCropViewOverlayEdge) {
 };
 
 @interface TOCropView () <UIScrollViewDelegate, UIGestureRecognizerDelegate>
-
-@property (nonatomic, strong, readwrite) UIImage *image;
 
 /* Views */
 @property (nonatomic, strong) UIImageView *backgroundImageView;     /* The main image view, placed within the scroll view */
@@ -87,6 +86,10 @@ typedef NS_ENUM(NSInteger, TOCropViewOverlayEdge) {
 @property (nonatomic, assign) CGSize originalCropBoxSize; /* Save the original crop box size so we can tell when the content has been edited */
 @property (nonatomic, assign, readwrite) BOOL canReset;
 
+@property (nonatomic, assign) CGFloat cropViewPadding;
+
+@property (nonatomic, assign) NSTimeInterval cropTimerDuration;
+
 - (void)setup;
 
 /* Image layout */
@@ -120,11 +123,22 @@ typedef NS_ENUM(NSInteger, TOCropViewOverlayEdge) {
 
 - (instancetype)initWithImage:(UIImage *)image
 {
+    return [self initWithImage:image withCropViewPadding:kTOCropViewDefaultPadding];
+}
+
+- (instancetype)initWithImage:(UIImage *)image withCropViewPadding:(CGFloat)padding
+{
+    return [self initWithImage:image withCropViewPadding:padding withCropTimerDuration:kTOCropTimerDefaultDuration];
+}
+
+- (instancetype)initWithImage:(UIImage *)image withCropViewPadding:(CGFloat)padding withCropTimerDuration:(NSTimeInterval)cropTimerDuration
+{
     if (self = [super init]) {
         _image = image;
+        _cropViewPadding = padding;
+        _cropTimerDuration = cropTimerDuration;
         [self setup];
     }
-    
     return self;
 }
 
@@ -184,7 +198,7 @@ typedef NS_ENUM(NSInteger, TOCropViewOverlayEdge) {
     self.translucencyView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     [self addSubview:self.translucencyView];
     
-    self.foregroundContainerView = [[UIView alloc] initWithFrame:(CGRect){0,0,200,200}];
+    self.foregroundContainerView = [[UIView alloc] initWithFrame:self.backgroundContainerView.frame];
     self.foregroundContainerView.clipsToBounds = YES;
     self.foregroundContainerView.userInteractionEnabled = NO;
     [self addSubview:self.foregroundContainerView];
@@ -579,7 +593,7 @@ typedef NS_ENUM(NSInteger, TOCropViewOverlayEdge) {
     if (self.resetTimer)
         return;
     
-    self.resetTimer = [NSTimer scheduledTimerWithTimeInterval:kTOCropTimerDuration target:self selector:@selector(timerTriggered) userInfo:nil repeats:NO];
+    self.resetTimer = [NSTimer scheduledTimerWithTimeInterval:self.cropTimerDuration target:self selector:@selector(timerTriggered) userInfo:nil repeats:NO];
 }
 
 - (void)timerTriggered
@@ -745,6 +759,18 @@ typedef NS_ENUM(NSInteger, TOCropViewOverlayEdge) {
     [self setSimpleMode:simpleMode animated:NO];
 }
 
+- (void)setImage:(UIImage *)image {
+    CGSize originSize = _image.size;
+    _image = image;
+    self.backgroundImageView.image = _image;
+    self.foregroundImageView.image = _image;
+    if (!CGSizeEqualToSize(image.size, originSize)) {
+        // the image size has changed, needs to refresh frame
+        self.backgroundImageView.frame = (CGRect){CGPointZero, image.size};
+        [self resetLayoutToDefaultAnimated:NO];
+    }
+}
+
 - (BOOL)cropBoxAspectRatioIsPortrait
 {
     CGRect cropFrame = self.cropBoxFrame;
@@ -773,6 +799,26 @@ typedef NS_ENUM(NSInteger, TOCropViewOverlayEdge) {
     frame.size.height = MIN(imageSize.height, frame.size.height);
     
     return frame;
+}
+
+- (void)getCroppedImage:(void (^)(UIImage *image))returnImage
+{
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        CGRect cropFrame = self.croppedImageFrame;
+        NSInteger angle = self.angle;
+        UIImage *image = nil;
+        if (angle == 0 && CGRectEqualToRect(cropFrame, (CGRect){CGPointZero, self.image.size})) {
+            image = self.image;
+        }
+        else {
+            image = [self.image croppedImageWithFrame:cropFrame angle:angle];
+        }
+        if (returnImage) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                returnImage(image);
+            });
+        }
+    });
 }
 
 - (void)setCroppingViewsHidden:(BOOL)hidden
@@ -1222,10 +1268,10 @@ typedef NS_ENUM(NSInteger, TOCropViewOverlayEdge) {
 - (CGRect)contentBounds
 {
     CGRect contentRect = CGRectZero;
-    contentRect.origin.x = kTOCropViewPadding + self.cropRegionInsets.left;
-    contentRect.origin.y = kTOCropViewPadding + self.cropRegionInsets.top;
-    contentRect.size.width = CGRectGetWidth(self.bounds) - ((kTOCropViewPadding * 2) + self.cropRegionInsets.left + self.cropRegionInsets.right);
-    contentRect.size.height = CGRectGetHeight(self.bounds) - ((kTOCropViewPadding * 2) + self.cropRegionInsets.top + self.cropRegionInsets.bottom);
+    contentRect.origin.x = self.cropViewPadding + self.cropRegionInsets.left;
+    contentRect.origin.y = self.cropViewPadding + self.cropRegionInsets.top;
+    contentRect.size.width = CGRectGetWidth(self.bounds) - ((self.cropViewPadding * 2) + self.cropRegionInsets.left + self.cropRegionInsets.right);
+    contentRect.size.height = CGRectGetHeight(self.bounds) - ((self.cropViewPadding * 2) + self.cropRegionInsets.top + self.cropRegionInsets.bottom);
     return contentRect;
 }
 
